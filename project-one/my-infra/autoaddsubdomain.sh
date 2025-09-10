@@ -51,5 +51,5 @@ sudo nginx -t && sudo nginx -s reload
 
 echo "Add https for the ${domain_name}.ilearners.online"
 sudo certbot --nginx -d "${domain_name}.ilearners.online"
-    exit 1
+#    exit 1
 fi
