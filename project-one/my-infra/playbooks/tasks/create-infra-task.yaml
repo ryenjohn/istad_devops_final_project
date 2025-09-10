@@ -25,6 +25,14 @@
     state: present # absent -> delete instance
     metadata:
       ssh-keys: "first-project:{{ ssh_pubkey['content'] | b64decode }}"
+      startup-script: |
+            #!/bin/bash
+            echo "Starting install software on each machine..."
+            sudo apt update -y
+            sudo apt install fish -y
+            sudo apt install dnsutils -y
+            sudo apt install nginx -y
+            sudo apt install certbot python3-certbot-nginx -y
 
     disks:
       - auto_delete: true

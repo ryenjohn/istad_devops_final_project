@@ -33,19 +33,19 @@ ubuntu_specs:
 # Define machines that we will create
 machines_info:
   # all server requirement : RAM 8G, ....
-  - name: "jenkins-server"
+  - name: "jenkins"
     machine_type: "{{ machine_specs.medium.machine_type }}"
     image: "{{ ubuntu_specs.v22.image }}"
     zone: "{{ machine_specs.large.zone }}"
     disk_size: "{{ machine_specs.medium.disk_size }}"
     disk_type: "{{ machine_specs.medium.disk_type }}"
-  - name: "sonarqube-server"
+  - name: "sonarqube"
     machine_type: "{{ machine_specs.medium.machine_type }}"
     image: "{{ ubuntu_specs.v22.image }}"
     zone: "{{ machine_specs.medium.zone }}"
     disk_size: "{{ machine_specs.medium.disk_size }}"
     disk_type: "{{ machine_specs.medium.disk_type }}"
-  - name: "nexus-server"
+  - name: "nexus"
     image: "{{ ubuntu_specs.v22.image }}"
     machine_type: "{{ machine_specs.medium.machine_type }}"
     zone: "{{ machine_specs.medium.zone }}"
