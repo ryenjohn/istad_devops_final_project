@@ -1,0 +1,212 @@
+## install software based required on each machine
+
+---
+- hosts: jenkins
+  become: yes
+  tasks:
+    - name: Update APT cache
+      apt:
+        update_cache: yes
+
+    - name: Install dependencies
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - unzip
+          - python3-pip
+          - software-properties-common
+          - zsh
+        state: present
+
+    - name: Install glab (GitLab CLI) if not installed
+      shell: curl -s https://raw.githubusercontent.com/profclems/glab/trunk/scripts/install.sh | bash
+      args:
+        executable: /bin/bash
+        creates: /usr/local/bin/glab
+
+    - name: Check if Oh My Zsh is already installed
+      stat:
+        path: "{{ ansible_env.HOME }}/.oh-my-zsh"
+      register: ohmyzsh_stat
+
+    - name: Install Oh My Zsh if not installed
+      shell: |
+        RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+      args:
+        executable: /bin/bash
+      when: not ohmyzsh_stat.stat.exists
+
+    - name: Install Docker if not installed
+      shell: curl -fsSL https://get.docker.com | sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Install Docker Compose
+      pip:
+        name: docker-compose
+        state: present
+
+    - name: Install Ansible
+      apt:
+        name: ansible
+        state: present
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Install Certbot
+      apt:
+        name: certbot
+        state: present
+
+    - name: Deploy Portainer if not running
+      shell: |
+        docker volume create portainer_data || true
+        docker ps -a | grep portainer || docker run -d -p 9000:9000 -p 9443:9443 \
+          --name portainer \
+          --restart=always \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v portainer_data:/data \
+          portainer/portainer-ce:latest
+      args:
+        executable: /bin/bash
+
+
+- hosts: sonarqube
+  become: yes
+  tasks:
+    - name: Update APT cache
+      apt:
+        update_cache: yes
+
+    - name: Install Zsh
+      apt:
+        name: zsh
+        state: present
+
+    - name: Install Docker if not installed
+      shell: curl -fsSL https://get.docker.com | sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Check if Oh My Zsh is already installed
+      stat:
+        path: "{{ ansible_env.HOME }}/.oh-my-zsh"
+      register: ohmyzsh_stat
+
+    - name: Install Oh My Zsh if not installed
+      shell: |
+        RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+      args:
+        executable: /bin/bash
+      when: not ohmyzsh_stat.stat.exists
+
+    - name: Deploy Portainer if not running
+      shell: |
+        docker volume create portainer_data || true
+        docker ps -a | grep portainer || docker run -d -p 9000:9000 -p 9443:9443 \
+          --name portainer \
+          --restart=always \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v portainer_data:/data \
+          portainer/portainer-ce:latest
+      args:
+        executable: /bin/bash
+
+
+- hosts: nexus
+  become: yes
+  tasks:
+    - name: Update APT cache
+      apt:
+        update_cache: yes
+
+    - name: Install Zsh
+      apt:
+        name: zsh
+        state: present
+
+    - name: Install Docker if not installed
+      shell: curl -fsSL https://get.docker.com | sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Check if Oh My Zsh is already installed
+      stat:
+        path: "{{ ansible_env.HOME }}/.oh-my-zsh"
+      register: ohmyzsh_stat
+
+    - name: Install Oh My Zsh if not installed
+      shell: |
+        RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+      args:
+        executable: /bin/bash
+      when: not ohmyzsh_stat.stat.exists
+
+    - name: Deploy Portainer if not running
+      shell: |
+        docker volume create portainer_data || true
+        docker ps -a | grep portainer || docker run -d -p 9000:9000 -p 9443:9443 \
+          --name portainer \
+          --restart=always \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v portainer_data:/data \
+          portainer/portainer-ce:latest
+      args:
+        executable: /bin/bash
+
+    - name: Ensure Docker registry directory exists
+      file:
+        path: /srv/docker-repo
+        state: directory
+        mode: '0755'
+
+    - name: Setup Docker Registry (Blob) if not running
+      shell: |
+        docker ps -a | grep registry || docker run -d -p 5000:5000 \
+          --restart=always \
+          --name registry \
+          -v /srv/docker-repo:/var/lib/registry \
+          registry:2
+      args:
+        executable: /bin/bash
+
+    - name: Ensure Helm repository directory exists
+      file:
+        path: /srv/helm-repo
+        state: directory
+        mode: '0755'
+
+    - name: Setup Helm Repository (ChartMuseum) if not running
+      shell: |
+        docker ps -a | grep chartmuseum || docker run -d -p 8879:8879 \
+          --restart=always \
+          --name chartmuseum \
+          -v /srv/helm-repo:/charts \
+          -e STORAGE="local" \
+          -e STORAGE_LOCAL_ROOTDIR="/charts" \
+          chartmuseum/chartmuseum:latest
+      args:
+        executable: /bin/bash

@@ -4,6 +4,10 @@ setup-infra:
     echo "Starting create all the machines ...."
     ansible-playbook playbooks/setup-infra-instance.yaml
     echo "The machines done created!"
+install-soft:
+    echo "Installing software on each machine..."
+    ansible-playbook -i inventory.ini playbooks/install-software.yaml
+    echo "Done installed!"
 destroy-infra:
     echo "Processing destroy the machines..."
     ansible-playbook playbooks/destroy-infra.yaml
