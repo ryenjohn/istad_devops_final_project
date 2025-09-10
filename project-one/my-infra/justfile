@@ -1,0 +1,10 @@
+#!/bin/bash
+
+setup-infra:
+    echo "Starting create all the machines ...."
+    ansible-playbook playbooks/setup-infra-instance.yaml
+    echo "The machines done created!"
+destroy-infra:
+    echo "Processing destroy the machines..."
+    ansible-playbook playbooks/destroy-infra.yaml
+    echo "Done removed!"
