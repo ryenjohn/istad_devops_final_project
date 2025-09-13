@@ -1,4 +1,4 @@
-## install software based required on each machine
+## Install software based required on each machine
 
 ---
 - hosts: jenkins
@@ -120,7 +120,7 @@
     - name: Deploy Portainer if not running
       shell: |
         docker volume create portainer_data || true
-        docker ps -a | grep portainer || docker run -d -p 9000:9000 -p 9443:9443 \
+        docker ps -a | grep portainer || docker run -d -p 9001:9000 -p 9443:9443 \
           --name portainer \
           --restart=always \
           -v /var/run/docker.sock:/var/run/docker.sock \

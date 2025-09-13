@@ -15,16 +15,6 @@ machine_specs:
     disk_size: 15
     disk_type: "pd-standard"
 
-# another style if you are interested
-# infra:
-#   masters:
-#     master1:
-#     master2:
-#     master3:
-#   workers:
-#     worker1:
-#     worker2:
-
 ubuntu_specs:
   v22:
     image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"

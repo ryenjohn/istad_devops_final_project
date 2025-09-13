@@ -4,6 +4,10 @@ setup-infra:
     echo "Starting create all the machines ...."
     ansible-playbook playbooks/setup-infra-instance.yaml
     echo "The machines done created!"
+install-service:
+    echo "Installing service on each machine..."
+    ansible-playbook -i inventory.ini playbooks/install-service.yaml
+    echo "Done setup!"
 install-soft:
     echo "Installing software on each machine..."
     ansible-playbook -i inventory.ini playbooks/install-software.yaml
