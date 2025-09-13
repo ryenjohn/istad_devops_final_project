@@ -1,6 +1,6 @@
 ## Issue sonarqube service can not access via web-browser!
 
-````
+```
 Fix step-by-step (for persistent volumes)
 
 docker rm -f sonarqube
