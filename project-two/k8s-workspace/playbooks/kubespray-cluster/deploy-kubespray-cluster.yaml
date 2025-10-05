@@ -1,0 +1,56 @@
+# Deploy kubespray cluster
+
+---
+- name: Deploy Kubernetes cluster using Kubespray and setup kubeconfig
+  hosts: node1-master1
+  become: yes
+  vars:
+    kubespray_dir: "/home/{{ ansible_user }}/kubespray"
+    inventory_dir: "{{ kubespray_dir }}/inventory/prod"
+    kube_dir: "/home/second-project/.kube"
+    kube_config: "{{ kube_dir }}/config"
+
+  tasks:
+
+    - name: Execute Kubespray deployment
+      shell: >
+        ansible-playbook -b -v -i {{ inventory_dir }}/hosts.ini cluster.yml | tee /tmp/kubespray.log
+      args:
+        chdir: "{{ kubespray_dir }}"
+        executable: /bin/bash
+      become_user: "{{ ansible_user }}"
+      register: kubespray_output
+      ignore_errors: yes
+
+    - name: Ensure kubeconfig directory exists
+      file:
+        path: "{{ kube_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: 0755
+
+    - name: Copy kubeconfig from /etc/kubernetes/admin.conf
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "{{ kube_config }}"
+        remote_src: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: 0600
+
+    - name: Get all resources across all namespaces
+      shell: "kubectl get all -A --kubeconfig {{ kube_config }}"
+      register: kubectl_all
+      changed_when: false
+
+    - debug:
+        var: kubectl_all.stdout
+
+    - name: Get nodes
+      shell: "kubectl get nodes --kubeconfig {{ kube_config }}"
+      register: kubectl_nodes
+      changed_when: false
+
+    - debug:
+        var: kubectl_nodes.stdout

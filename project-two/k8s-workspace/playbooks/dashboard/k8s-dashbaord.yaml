@@ -1,0 +1,120 @@
+---
+- name: Deploy Kubernetes Dashboard with TLS and Ingress
+  hosts: node1-master1
+  become: yes
+  vars:
+    kubespray_dir: "/home/{{ ansible_user }}/kubespray"
+    dashboard_manifest: "{{ kubespray_dir }}/dashboard-deploy.yml"
+
+    dashboard_content: |
+      ---
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: kubernetes-dashboard
+
+      ---
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: admin-user
+        namespace: kubernetes-dashboard
+
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: admin-user-binding
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-admin
+      subjects:
+        - kind: ServiceAccount
+          name: admin-user
+          namespace: kubernetes-dashboard
+
+      ---
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: all-clusterissuer
+      spec:
+        acme:
+          server: https://acme-v02.api.letsencrypt.org/directory
+          email: bunchhoeunsong@gmail.com
+          privateKeySecretRef:
+            name: letsencrypt-key
+          solvers:
+            - http01:
+                ingress:
+                  class: nginx
+
+      ---
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: kubernetes-dashboard-ingress
+        namespace: kubernetes-dashboard
+        annotations:
+          cert-manager.io/cluster-issuer: all-clusterissuer
+          kubernetes.io/ingress.class: nginx
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+      spec:
+        tls:
+          - hosts:
+              - kube-dashboard.ilearners.online
+            secretName: kubernetes-tls
+        rules:
+          - host: kube-dashboard.ilearners.online
+            http:
+              paths:
+                - pathType: Prefix
+                  path: "/"
+                  backend:
+                    service:
+                      name: kubernetes-dashboard
+                      port:
+                        number: 443
+
+  tasks:
+    - name: Allow scheduling on master node (remove NoSchedule taint)
+      shell: |
+        kubectl taint nodes node1-master1 node-role.kubernetes.io/control-plane:NoSchedule- || true
+      args:
+        executable: /bin/bash
+
+    - name: Create dashboard manifest file
+      copy:
+        dest: "{{ dashboard_manifest }}"
+        content: "{{ dashboard_content }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+
+    - name: Ensure cert-manager is installed (skip if already installed)
+      shell: |
+        kubectl get pods -n cert-manager >/dev/null 2>&1 || \
+        kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+      args:
+        executable: /bin/bash
+
+    - name: Deploy official Kubernetes Dashboard
+      shell: |
+        kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+      args:
+        executable: /bin/bash
+
+    - name: Patch Dashboard service to NodePort in kube-system
+      shell: |
+        kubectl patch svc kubernetes-dashboard -n kube-system -p '{"spec":{"type":"NodePort"}}'
+      args:
+        executable: /bin/bash
+      ignore_errors: yes
+
+    - name: Patch Dashboard service to NodePort in kubernetes-dashboard namespace
+      shell: |
+        kubectl patch svc kubernetes-dashboard -n kubernetes-dashboard -p '{"spec":{"type":"NodePort"}}'
+      args:
+        executable: /bin/bash
+      ignore_errors: yes

@@ -1,0 +1,19 @@
+k8s-instances:
+    echo "Create all the masters ....  "
+    ansible-playbook playbooks/create-masters-instance.yaml
+    echo "Create all the workers ..... "
+    ansible-playbook playbooks/create-workers-instance.yaml
+
+kubespray:
+    echo "Copy public keygen to nodes..."
+    ansible-playbook -i inventory.ini playbooks/kubespray-cluster/ssh-key.yaml
+    echo "Setup kubespray..."
+    ansible-playbook -i inventory.ini playbooks/kubespray-cluster/setup-kubespray.yaml
+    echo "Deploy kubespray cluster..."
+    ansible-playbook -i inventory.ini playbooks/kubespray-cluster/deploy-kubespray-cluster.yaml
+
+deploy-dash:
+    echo "Deploy dashboard for kubernetes..."
+    ansible-playbook -i inventory.ini playbooks/dashboard/k8s-dashboard.yaml
+    echo "Deploy dashboard for argocd..."
+    ansible-playbook -i inventory.ini playbooks/dashboard/argocd-dashboard.yaml

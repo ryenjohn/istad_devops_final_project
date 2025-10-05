@@ -1,0 +1,43 @@
+# generate ssh-key then copy key to itself and other nodes
+
+---
+- name: Generate SSH key on node1-master1
+  hosts: node1-master1
+  become: false
+  vars:
+    ssh_key_path: "/home/{{ ansible_user }}/.ssh/id_rsa"
+  tasks:
+    - name: Ensure .ssh directory exists
+      file:
+        path: "/home/{{ ansible_user }}/.ssh"
+        state: directory
+        mode: '0700'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Generate SSH key if not present
+      command: ssh-keygen -t rsa -b 4096 -f {{ ssh_key_path }} -N ''
+      args:
+        creates: "{{ ssh_key_path }}"
+
+    - name: Read public key content
+      slurp:
+        src: "{{ ssh_key_path }}.pub"
+      register: ssh_pubkey
+
+    - name: Set public key fact for reuse
+      set_fact:
+        master_pub_key: "{{ ssh_pubkey.content | b64decode }}"
+
+- name: Copy SSH key to all nodes (including itself)
+  hosts:
+    - node1-master1
+    - node2-worker1
+    - node3-worker2
+  become: false
+  tasks:
+    - name: Add master1 SSH key to authorized_keys
+      authorized_key:
+        user: "{{ ansible_user }}"
+        state: present
+        key: "{{ hostvars['node1-master1']['master_pub_key'] }}"

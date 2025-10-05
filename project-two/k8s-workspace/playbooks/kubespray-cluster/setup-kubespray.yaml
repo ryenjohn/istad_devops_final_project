@@ -1,0 +1,104 @@
+---
+## Prepare for kubespray cluster
+
+- name: Prepare all nodes for Kubespray
+  hosts: all
+  become: yes
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Ensure net.ipv4.ip_forward=1
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: 1
+        state: present
+        sysctl_set: yes
+        reload: yes
+
+    - name: Install Python3, pip, and git
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - git
+        state: present
+        update_cache: yes
+
+- name: Setup Kubespray on master node
+  hosts: node1-master1
+  become: yes
+  vars:
+    kubespray_repo: "https://github.com/kubernetes-sigs/kubespray.git"
+    kubespray_dir: "/home/{{ ansible_user }}/kubespray"
+    inventory_dir: "{{ kubespray_dir }}/inventory/prod"
+
+  tasks:
+    - name: Clone Kubespray repository
+      git:
+        repo: "{{ kubespray_repo }}"
+        dest: "{{ kubespray_dir }}"
+        version: master
+
+    - name: Fix ownership and permissions on kubespray dir
+      file:
+        path: "{{ kubespray_dir }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+        recurse: yes
+
+    - name: Install Kubespray Python dependencies
+      pip:
+        requirements: "{{ kubespray_dir }}/requirements.txt"
+        executable: pip3
+
+    - name: Copy sample inventory to prod
+      command: cp -rfp inventory/sample inventory/prod
+      args:
+        chdir: "{{ kubespray_dir }}"
+
+    - name: Render hosts.ini for Kubespray
+      copy:
+        src: /home/second-project/k8s-instances/inventory.ini
+        dest: "{{ inventory_dir }}/hosts.ini"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+
+    - name: Patch ansible.cfg for Kubespray
+      blockinfile:
+        path: "{{ kubespray_dir }}/ansible.cfg"
+        create: yes
+        block: |
+          remote_user={{ ansible_user }}
+
+    - name: Comment out existing cluster_name
+      replace:
+        path: "{{ inventory_dir }}/group_vars/k8s_cluster/k8s-cluster.yml"
+        regexp: '^(cluster_name:.*)'
+        replace: '# \1'
+
+    - name: Set cluster vars
+      blockinfile:
+        path: "{{ inventory_dir }}/group_vars/k8s_cluster/k8s-cluster.yml"
+        insertafter: EOF
+        block: |
+          kubelet_max_pods: 100
+          cluster_name: prod
+          helm_enabled: true
+
+    # ---------------- Enable addons (auto-uncomment & set true) ----------------
+    - name: Enable addons in Kubespray inventory
+      lineinfile:
+        path: "{{ inventory_dir }}/group_vars/k8s_cluster/addons.yml"
+        regexp: '^#?(\s*{{ item }}:).*$'
+        line: '{{ item }}: true'
+      loop:
+        - dashboard_enabled
+        - helm_enabled
+        - metrics_server_enabled
+        - ingress_nginx_enabled
+        - cert_manager_enabled
+        - argocd_enabled

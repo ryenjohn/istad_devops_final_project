@@ -1,0 +1,43 @@
+---
+- name: Add reverse proxy config for a domain on node1-master1
+  hosts: node1-master1
+  become: yes
+  vars:
+    domain_name: "{{ domain_name }}"
+    service_port: "{{ service_port }}"
+    nginx_conf_dir: /etc/nginx/conf.d
+    nginx_conf_file: "{{ nginx_conf_dir }}/{{ domain_name }}.conf"
+
+  tasks:
+
+    - name: Check if Nginx config for domain already exists
+      stat:
+        path: "{{ nginx_conf_file }}"
+      register: conf_file
+
+    - name: Write reverse proxy config if it does not exist
+      copy:
+        dest: "{{ nginx_conf_file }}"
+        content: |
+          server {
+              listen 80;
+              listen [::]:80;
+              server_name {{ domain_name }}.ilearners.online;
+
+              location / {
+                  proxy_pass http://localhost:{{ service_port }};
+                  proxy_set_header Host $http_host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+          }
+      when: not conf_file.stat.exists
+      notify: Reload Nginx
+
+  handlers:
+  - name: Test Nginx config
+    command: nginx -t
+
+  - name: Reload Nginx
+    command: nginx -s reload

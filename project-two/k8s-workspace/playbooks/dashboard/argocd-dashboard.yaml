@@ -1,0 +1,82 @@
+# setup argocd ingress with cert-manager & letsencrypt
+
+- name: Deploy ArgoCD Ingress with TLS
+  hosts: node1-master1
+  become: yes
+  vars:
+    argocd_manifest_file: "/home/{{ ansible_user }}/kubespray/argocd-ingress.yml"
+    argocd_manifest_content: |
+      ---
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: argocd-clusterissuer
+        namespace: argocd
+      spec:
+        acme:
+          server: https://acme-v02.api.letsencrypt.org/directory
+          email: bunchhoeunsong@gmail.com
+          privateKeySecretRef:
+            name: argocd-letsencrypt-key
+          solvers:
+            - http01:
+                ingress:
+                  class: nginx
+      ---
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: argocd-server-ingress
+        namespace: argocd
+        annotations:
+          cert-manager.io/cluster-issuer: argocd-clusterissuer
+          kubernetes.io/ingress.class: nginx
+          kubernetes.io/tls-acme: "true"
+          nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+          # If you encounter a redirect loop or 307 response, force HTTPS to backend:
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+      spec:
+        ingressClassName: nginx
+        rules:
+          - host: argocd.ilearners.online
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: argocd-server
+                      port:
+                        name: https
+        tls:
+          - hosts:
+              - argocd.ilearners.online
+            secretName: argocd-secret # Managed by cert-manager
+
+  tasks:
+    - name: Allow scheduling on master node (remove NoSchedule taint)
+      shell: |
+        kubectl taint nodes node1-master1 node-role.kubernetes.io/control-plane:NoSchedule- || true
+      args:
+        executable: /bin/bash
+
+    - name: Create ArgoCD ingress manifest file
+      copy:
+        dest: "{{ argocd_manifest_file }}"
+        content: "{{ argocd_manifest_content }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+
+    - name: Apply ArgoCD Ingress and ClusterIssuer
+      shell: |
+        kubectl apply -f {{ argocd_manifest_file }}
+      args:
+        chdir: "/home/{{ ansible_user }}/kubespray"
+        executable: /bin/bash
+
+    - name: Ensure ArgoCD server service type is LoadBalancer
+      shell: |
+        kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
+      args:
+        executable: /bin/bash
